@@ -3,7 +3,7 @@
 Fork of the good old ClyphX (for more info see [here](https://github.com/ldrolez/clyphx-live10/)).
 No idea where I got the original source from though.
 
-Supports triggering actions by sening an osc message to port 9000 like this:
+Supports triggering actions by sending an osc message to port 9000 like this:
 ```
 /clyphx/trigger METRO "2/PLAY 3" ETC
 ```
