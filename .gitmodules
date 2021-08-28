@@ -1,0 +1,3 @@
+[submodule "osc"]
+	path = osc
+	url = https://github.com/tuchella/LiveOSC

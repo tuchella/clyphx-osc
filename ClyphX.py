@@ -48,6 +48,9 @@ from consts import *
 if IS_LIVE_9_5:
     from PushEmuHandler import MockHandshakeTask, MockHandshake
 
+from osc import RemixNet
+from osc import OSC
+
 FOLDER = '/ClyphX/'
 SCRIPT_NAME = 'nativeKONTROL ClyphX v2.6.2 for Live 9'
     
@@ -88,6 +91,13 @@ class ClyphX(ControlSurface):
             self.setup_tracks()
         self.log_message('nativeKONTROL LOG ------- ' + SCRIPT_NAME + ' ------- Live Version: ' + str(live.get_major_version()) + '.' + str(live.get_minor_version()) + '.' + str(live.get_bugfix_version()) + ' ------- END LOG')
         self.show_message(SCRIPT_NAME)
+
+        self.oscEndpoint = RemixNet.OSCEndpoint()
+        self.oscEndpoint.send('/remix/oscserver/startup', 1)
+        self.oscEndpoint.callbackManager.add('/clyphx/trigger', self.handle_osc_trigger)
+        
+        self.log_message("LiveOSC initialized")
+        
         
     def disconnect(self):
         self._push_apc_combiner = None
@@ -107,6 +117,9 @@ class ClyphX(ControlSurface):
         self._play_seq_clips = {}
         self._loop_seq_clips = {}
         self._current_tracks = []
+        self.oscEndpoint.send('/remix/oscserver/shutdown', 1)
+        self.oscEndpoint.shutdown()
+        self.oscEndpoint = None
         ControlSurface.disconnect(self)
             
         
@@ -177,6 +190,8 @@ class ClyphX(ControlSurface):
                                 self._dr_actions.dispatch_pad_action(dr, t, xclip, ident, args.strip())
                     elif action_name in self._user_actions._action_dict:
                         getattr(self._user_actions, self._user_actions._action_dict[action_name])(t, args)
+                    elif tracks.index(t) == 0:
+                        self.oscEndpoint.send('/remix/oscserver/unknown', str(t.name) + "/" + str(action_name) + " " + str(args))
         if self._is_debugging:
             self.log_message('action_dispatch triggered, ident=' + str(ident) + ' and track(s)=' + str(self.track_list_to_string(tracks)) + ' and action=' + str(action_name) + ' and args=' + str(args))
 
@@ -766,6 +781,26 @@ class ClyphX(ControlSurface):
     def handle_nonsysex(self, midi_bytes):
         """ Override so that ControlSurface doesn't report this to Log.txt """
         pass
+        
+    def handle_osc_trigger(self, msg, source):
+        self.show_message('osc trigger received: ' + str(msg))
+        for m in msg[2:]:
+            self.handle_m4l_trigger(m)
+            self.oscEndpoint.send('/remix/oscserver/info', m)
+     
+    def update_display(self):
+        """
+        This function is run every 100ms, so we use it to initiate our Song.current_song_time
+        listener to allow us to process incoming OSC commands as quickly as possible under
+        the current listener scheme.
+        """
+        ControlSurface.update_display(self)
+        if self.oscEndpoint:
+            try:
+                self.oscEndpoint.processIncomingUDP()
+            except:
+                self.log_message('error processing incoming UDP packets:', sys.exc_info())
+   
 
 # local variables:
 # tab-width: 4
