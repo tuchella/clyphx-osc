@@ -95,6 +95,8 @@ class ClyphX(ControlSurface):
         self.oscEndpoint = RemixNet.OSCEndpoint()
         self.oscEndpoint.send('/remix/oscserver/startup', 1)
         self.oscEndpoint.callbackManager.add('/clyphx/trigger', self.handle_osc_trigger)
+        self.oscEndpoint.callbackManager.add('/clyphx/info/tracks', self.handle_osc_track_list_query)
+        self.osc_tl_changed = True
         
         self.log_message("LiveOSC initialized")
         
@@ -745,6 +747,7 @@ class ClyphX(ControlSurface):
     def _on_track_list_changed(self):
         ControlSurface._on_track_list_changed(self)
         self.setup_tracks()
+        self.osc_tl_changed = True
         
         
     def connect_script_instances(self, instanciated_scripts):
@@ -787,6 +790,31 @@ class ClyphX(ControlSurface):
         for m in msg[2:]:
             self.handle_m4l_trigger(m)
             self.oscEndpoint.send('/remix/oscserver/info', m)
+
+    def handle_osc_track_list_query(self, msg, source):
+        if self.osc_tl_changed:
+            self.oscEndpoint.send('/clyphx/info/tracks/changed', 1)
+
+            tracks = []
+            for i, t in enumerate(self.song().tracks):
+                tracks.append((str(i+1),t))
+            for i, r in enumerate(self.song().return_tracks):
+                tracks.append((chr(i + 65), r))
+            tracks.append(('MST', self.song().master_track))
+            for (id, t) in tracks:
+                type = 'OTHER'
+                if (t.has_midi_input):
+                    type = 'MIDI'
+                if (t.has_audio_input):
+                    type = 'AUDIO'
+                if (t.is_foldable):
+                    type = 'GROUP'
+
+                self.oscEndpoint.send('/clyphx/info/tracks', str(id) + ' ' + str(t.name) + ' ' + type) 
+            
+            self.osc_tl_changed = False
+        else:
+           self.oscEndpoint.send('/clyphx/info/tracks/changed', 0) 
      
     def update_display(self):
         """
